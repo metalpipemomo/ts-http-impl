@@ -13,6 +13,7 @@ type HttpReq = {
     method: Method;
     endpoint: string;
     params?: { [key: string]: string };
+    headers?: { [key: string]: string };
 };
 
 type ResType = object | string;
@@ -57,11 +58,16 @@ class RequestBuilder {
     private method: Method;
     private endpoint: string;
     private params: { [key: string]: string } = {};
+    private headers: { [key: string]: string } = {};
     
     constructor(req: string, registeredRoutes: Map<string, HttpEndpoint>) {
-        const headers = req.split(" ");
-        this.method = headers[0] as Method;
-        this.endpoint = headers[1];
+        const reqBody = req.split(" ");
+        this.method = reqBody[0] as Method;
+        this.endpoint = reqBody[1];
+        const specialCharSplit = req.split("\r\n");
+        this.headers = specialCharSplit
+            .slice(1, specialCharSplit.length)
+            .reduce((a, v) => { return { ...a, [v.split(':')[0].replace('-', '_').toLowerCase()]: v.split(' ')[1] } }, {});
 
         for (let [route] of registeredRoutes) {
             // Replace params with a regex group that matches one or more words/hyphens
@@ -86,7 +92,8 @@ class RequestBuilder {
         return {
             method: this.method,
             endpoint: this.endpoint,
-            params: this.params
+            params: this.params,
+            headers: this.headers
         }
     }
 }
@@ -142,6 +149,14 @@ app.get("/", (req: HttpReq, res: HttpRes) => {
 app.get("/echo/:str", (req: HttpReq, res: HttpRes) => {
     res.status("200").send(req.params?.str);
 });
+
+app.get("/user-agent", (req: HttpReq, res: HttpRes) => {
+    if (req.headers?.user_agent) {
+        res.status("200").send(req.headers.user_agent);
+    } else {
+        res.status("404").send("No user-agent header found.");
+    }
+})
 
 app.listen(4221, () => {
     console.log(`Server listening on port ${4221}`);
