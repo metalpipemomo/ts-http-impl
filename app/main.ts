@@ -1,4 +1,5 @@
 import net from "net";
+import fs from "fs";
 
 type Method = "GET" | "POST";
 
@@ -16,7 +17,7 @@ type HttpReq = {
     headers?: { [key: string]: string };
 };
 
-type ResType = object | string;
+type ResType = object | string | Buffer;
 
 class HttpRes {
     private statusCode: StatusCode = "404";
@@ -36,19 +37,33 @@ class HttpRes {
 
     send(data?: ResType) {
         let response = `HTTP/1.1 ${this.statusCode} ${ReasonPhrases[this.statusCode]}\r\n`;
-        if (typeof data === "object") {
+        
+        let body: string | Buffer = '';
+    
+        if (typeof data === "object" && !Buffer.isBuffer(data)) {
             let jsonData = JSON.stringify(data);
             this.header('Content-Type', 'application/json');
-            this.header('Content-Length', jsonData.length.toString());
+            this.header('Content-Length', Buffer.byteLength(jsonData).toString());
+            body = jsonData;
         } else if (typeof data === "string") {
             this.header('Content-Type', 'text/plain');
+            this.header('Content-Length', Buffer.byteLength(data).toString());
+            body = data;
+        } else if (Buffer.isBuffer(data)) {
+            this.header('Content-Type', 'application/octet-stream');
             this.header('Content-Length', data.length.toString());
+            body = data;
         }
+    
         let headers = Array.from(this.headers).map(([a, b]) => `${a}: ${b}\r\n`).join("");
-        let body: string = typeof data === "object" ? JSON.stringify(data) : data as string;
-        response = `${response}${headers}\r\n${typeof data !== 'undefined' ? body : ''}`;
+        response = `${response}${headers}\r\n`;
+    
         this.socket.write(response);
+        if (body) {
+            this.socket.write(body);
+        }
     }
+    
 
 }
 
@@ -67,7 +82,9 @@ class RequestBuilder {
         const specialCharSplit = req.split("\r\n");
         this.headers = specialCharSplit
             .slice(1, specialCharSplit.length)
-            .reduce((a, v) => { return { ...a, [v.split(':')[0].replace('-', '_').toLowerCase()]: v.split(' ')[1] } }, {});
+            .reduce((a, v) => {
+                return { ...a, [v.split(':')[0].replace('-', '_').toLowerCase()]: v.split(' ')[1] }
+            }, {});
 
         for (let [route] of registeredRoutes) {
             // Replace params with a regex group that matches one or more words/hyphens
@@ -156,7 +173,25 @@ app.get("/user-agent", (req: HttpReq, res: HttpRes) => {
     } else {
         res.status("404").send("No user-agent header found.");
     }
-})
+});
+
+app.get("/files/:filename", (req: HttpReq, res: HttpRes) => {
+    const path = process.argv.slice(-1);
+    if (req.params?.filename) {
+        const fileLocation = `${path}${req.params.filename}`;
+        console.log(fileLocation);
+        try {
+            let file = fs.readFileSync(fileLocation);
+            if (file) {
+                return res.status("200").send(file);
+            }
+        } catch {
+            return res.status("404").send("File not found");
+        }
+    }
+
+    return res.status("404").send("File not found");
+});
 
 app.listen(4221, () => {
     console.log(`Server listening on port ${4221}`);
