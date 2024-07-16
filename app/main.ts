@@ -46,6 +46,7 @@ class HttpRes {
         let headers = Array.from(this.headers).map(([a, b]) => `${a}: ${b}\r\n`).join("");
         let body: string = typeof data === "object" ? JSON.stringify(data) : data as string;
         response = `${response}${headers}\r\n${typeof data !== 'undefined' ? body : ''}`;
+        this.socket.write(response);
     }
 
 }
@@ -62,14 +63,19 @@ class RequestBuilder {
         this.method = headers[0] as Method;
         this.endpoint = headers[1];
 
-        for (let [route, handler] of registeredRoutes) {
+        for (let [route] of registeredRoutes) {
+            // Replace params with a regex group that matches one or more words/hyphens
             const routeRegex = new RegExp(`^${route.replace(/:[^\s/]+/g, '([\\w-]+)')}$`);
+            // Match target url against route regex
             const match = this.endpoint.match(routeRegex);
             if (match) {
+                // Extracts parameters into an array if they are found
                 const paramNames = route.match(/:[^\s/]+/g) || [];
+                // Strips parameters of : and shoves them into the params object
                 paramNames.forEach((paramName, idx) => {
                     this.params[paramName.substring(1)] = match[idx + 1];
                 });
+                // Sets endpoint to be the actual endpoint
                 this.endpoint = route;
                 break;
             }
