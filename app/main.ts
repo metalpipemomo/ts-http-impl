@@ -12,7 +12,10 @@ type StatusCode = keyof typeof ReasonPhrases;
 type HttpReq = {
     method: Method;
     endpoint: string;
+    params?: { [key: string]: string };
 };
+
+type ResType = object | string;
 
 class HttpRes {
     private statusCode: StatusCode = "404";
@@ -30,9 +33,19 @@ class HttpRes {
         this.headers.set(k, v);
     }
 
-    send() {
+    send(data?: ResType) {
+        let response = `HTTP/1.1 ${this.statusCode} ${ReasonPhrases[this.statusCode]}\r\n`;
+        if (typeof data === "object") {
+            let jsonData = JSON.stringify(data);
+            this.header('Content-Type', 'application/json');
+            this.header('Content-Length', jsonData.length.toString());
+        } else if (typeof data === "string") {
+            this.header('Content-Type', 'text/plain');
+            this.header('Content-Length', data.length.toString());
+        }
         let headers = Array.from(this.headers).map(([a, b]) => `${a}: ${b}\r\n`).join("");
-        this.socket.write(`HTTP/1.1 ${this.statusCode} ${ReasonPhrases[this.statusCode]}\r\n${headers}\r\n`);
+        let body: string = typeof data === "object" ? JSON.stringify(data) : data as string;
+        response = `${response}${headers}\r\n${typeof data !== 'undefined' ? body : ''}`;
     }
 
 }
@@ -42,17 +55,32 @@ type HttpEndpoint = (req: HttpReq, res: HttpRes) => void
 class RequestBuilder {
     private method: Method;
     private endpoint: string;
+    private params: { [key: string]: string } = {};
     
-    constructor(req: string) {
+    constructor(req: string, registeredRoutes: Map<string, HttpEndpoint>) {
         const headers = req.split(" ");
         this.method = headers[0] as Method;
         this.endpoint = headers[1];
+
+        for (let [route, handler] of registeredRoutes) {
+            const routeRegex = new RegExp(`^${route.replace(/:[^\s/]+/g, '([\\w-]+)')}$`);
+            const match = this.endpoint.match(routeRegex);
+            if (match) {
+                const paramNames = route.match(/:[^\s/]+/g) || [];
+                paramNames.forEach((paramName, idx) => {
+                    this.params[paramName.substring(1)] = match[idx + 1];
+                });
+                this.endpoint = route;
+                break;
+            }
+        }
     }
 
     build(): HttpReq {
         return {
             method: this.method,
-            endpoint: this.endpoint
+            endpoint: this.endpoint,
+            params: this.params
         }
     }
 }
@@ -68,9 +96,10 @@ class HttpServer {
 
         this.server = net.createServer((socket) => {
             socket.on('data', (data) => {
-                let reqBuilder = new RequestBuilder(data.toString());
+                const methodEndpoints = this.endpoints.get(data.toString().split(" ")[0] as Method);
+                let reqBuilder = new RequestBuilder(data.toString(), methodEndpoints!);
                 let req = reqBuilder.build();
-                let callback = this.endpoints.get(req.method)?.get(req.endpoint);
+                let callback = methodEndpoints?.get(req.endpoint);
                 if (callback) {
                     let res = new HttpRes(socket);
                     callback(req, res);
@@ -102,6 +131,10 @@ const app = new HttpServer();
 
 app.get("/", (req: HttpReq, res: HttpRes) => {
     res.status("200").send();
+});
+
+app.get("/echo/:str", (req: HttpReq, res: HttpRes) => {
+    res.status("200").send(req.params?.str);
 });
 
 app.listen(4221, () => {
