@@ -1,5 +1,6 @@
 import net from "net";
 import fs from "fs";
+import zlib from "zlib";
 
 type Method = "GET" | "POST";
 
@@ -8,6 +9,8 @@ const ReasonPhrases = {
     "201": "Created",
     "404": "Not Found"
 } as const;
+
+const AcceptableEncoding = new Set(["gzip"]);
 
 type StatusCode = keyof typeof ReasonPhrases;
 
@@ -25,7 +28,7 @@ class HttpRes {
     private statusCode: StatusCode = "404";
     private headers: Map<string, string> = new Map();
 
-    constructor(private socket: net.Socket) {}
+    constructor(private socket: net.Socket, private encode = false) {}
 
     status(statusCode: StatusCode) {
         this.statusCode = statusCode;
@@ -55,6 +58,14 @@ class HttpRes {
             this.header('Content-Type', 'application/octet-stream');
             this.header('Content-Length', data.length.toString());
             body = data;
+        }
+        if (this.encode) {
+            try {
+                body = zlib.gzipSync(body);
+                this.header('Content-Encoding', 'gzip');
+            } catch {
+                console.log("Failed to compress");
+            }
         }
     
         let headers = Array.from(this.headers).map(([a, b]) => `${a}: ${b}\r\n`).join("");
@@ -136,7 +147,11 @@ class HttpServer {
                 let req = reqBuilder.build();
                 let callback = methodEndpoints?.get(req.endpoint);
                 if (callback) {
-                    let res = new HttpRes(socket);
+                    let encode = false;
+                    if (req.headers?.accept_encoding && AcceptableEncoding.has(req.headers.accept_encoding)) {
+                        encode = true;
+                    }
+                    let res = new HttpRes(socket, encode);
                     callback(req, res);
                 } else {
                     socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
