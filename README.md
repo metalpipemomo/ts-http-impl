@@ -20,6 +20,12 @@ git clone https://github.com/metalpipemomo/ts-http-impl
 cd ts-http-impl
 ```
 
+2. Install dependencies
+
+```bash
+npm install
+```
+
 ## Usage
 
 Start the server by running:
