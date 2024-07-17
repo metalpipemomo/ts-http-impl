@@ -95,9 +95,9 @@ class RequestBuilder {
         this.endpoint = reqBody[1];
         const specialCharSplit = req.split("\r\n");
         this.headers = specialCharSplit
-            .slice(1, specialCharSplit.length)
+            .slice(1, specialCharSplit.length - 2)
             .reduce((a, v) => {
-                return { ...a, [v.split(':')[0].replace('-', '_').toLowerCase()]: v.split(' ')[1] }
+                return { ...a, [v.split(':')[0].replace('-', '_').toLowerCase()]: v.split(':')[1].trim() }
             }, {});
         this.body = specialCharSplit.slice(-1)[0];
 
@@ -148,8 +148,23 @@ class HttpServer {
                 let callback = methodEndpoints?.get(req.endpoint);
                 if (callback) {
                     let encode = false;
-                    if (req.headers?.accept_encoding && AcceptableEncoding.has(req.headers.accept_encoding)) {
-                        encode = true;
+                    if (req.headers?.accept_encoding) {
+                        if (req.headers.accept_encoding.split(',').length > 1) {
+                            let formats = new Set(
+                                req.headers.accept_encoding
+                                .split(',')
+                                .map((item) => item.trim())
+                            );
+                            console.log(formats);
+                            let encodings = new Set([...AcceptableEncoding].filter(i => formats.has(i)));
+                            console.log(encodings);
+                            // means that gzip was one of the formats
+                            if (encodings.size > 0) {
+                                encode = true;
+                            }
+                        } else if (AcceptableEncoding.has(req.headers.accept_encoding)) {
+                            encode = true;
+                        }
                     }
                     let res = new HttpRes(socket, encode);
                     callback(req, res);
