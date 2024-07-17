@@ -1,38 +1,85 @@
-[![progress-banner](https://backend.codecrafters.io/progress/http-server/0b2278d9-47bf-4d48-a9de-91a151f565b1)](https://app.codecrafters.io/users/codecrafters-bot?r=2qF)
+# HTTP Server Implementation with Node.js & TypeScript 
 
-This is a starting point for TypeScript solutions to the
-["Build Your Own HTTP server" Challenge](https://app.codecrafters.io/courses/http-server/overview).
+This project is an HTTP server implementation built using Node.js and TypeScript. No supporting libraries are used, only a Node utilities and a TCP connection.
 
-[HTTP](https://en.wikipedia.org/wiki/Hypertext_Transfer_Protocol) is the
-protocol that powers the web. In this challenge, you'll build a HTTP/1.1 server
-that is capable of serving multiple clients.
+This project was a [CodeCrafters](https://codecrafters.io/) challenge.
 
-Along the way you'll learn about TCP servers,
-[HTTP request syntax](https://www.w3.org/Protocols/rfc2616/rfc2616-sec5.html),
-and more.
+## Features
 
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
+- **Routing**
+- **Dynamic URLs**
+- **GET & POST Requests**:
+- **Gzip Compression**
 
-# Passing the first stage
+## Installation
 
-The entry point for your HTTP server implementation is in `app/main.ts`. Study
-and uncomment the relevant code, and push your changes to pass the first stage:
+1. Clone the repository:
 
-```sh
-git add .
-git commit -m "pass 1st stage" # any msg
-git push origin master
+```bash
+git clone https://github.com/metalpipemomo/ts-http-impl
+cd ts-http-impl
 ```
 
-Time to move on to the next stage!
+## Usage
 
-# Stage 2 & beyond
+Start the server by running:
 
-Note: This section is for stages 2 and beyond.
+```bash
+npm run dev
+```
 
-1. Ensure you have `bun (1.1)` installed locally
-1. Run `./your_program.sh` to run your program, which is implemented in
-   `app/main.ts`.
-1. Commit your changes and run `git push origin master` to submit your solution
-   to CodeCrafters. Test output will be streamed to your terminal.
+Keep in mind that `bun` must be installed to run this project.
+
+## API Endpoints Implemented for Showcase
+
+### GET /
+
+Returns a 200 OK status.
+
+### GET /echo/:str
+
+Echoes the string provided in the `:str` parameter.
+
+### GET /user-agent
+
+Returns the `user-agent` header from the request.
+
+### GET /files/:filename
+
+Serves the file with the specified `:filename` from the directory provided when starting the server.
+
+### POST /files/:filename
+
+Saves the request body as a file with the specified `:filename` in the directory provided when starting the server.
+
+## Example Requests
+
+### GET /
+
+```bash
+curl -X GET http://localhost:4221/
+```
+
+### GET /echo/hello
+
+```bash
+curl -X GET http://localhost:4221/echo/hello
+```
+
+### GET /user-agent
+
+```bash
+curl -X GET http://localhost:4221/user-agent
+```
+
+### GET /files/example.txt
+
+```bash
+curl -X GET http://localhost:4221/files/example.txt
+```
+
+### POST /files/example.txt
+
+```bash
+curl -X POST http://localhost:4221/files/example.txt -d "File content goes here"
+```
