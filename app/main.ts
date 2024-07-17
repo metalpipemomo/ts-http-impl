@@ -5,6 +5,7 @@ type Method = "GET" | "POST";
 
 const ReasonPhrases = {
     "200": "OK",
+    "201": "Created",
     "404": "Not Found"
 } as const;
 
@@ -15,6 +16,7 @@ type HttpReq = {
     endpoint: string;
     params?: { [key: string]: string };
     headers?: { [key: string]: string };
+    body?: { [key: string]: string } | string;
 };
 
 type ResType = object | string | Buffer;
@@ -74,6 +76,7 @@ class RequestBuilder {
     private endpoint: string;
     private params: { [key: string]: string } = {};
     private headers: { [key: string]: string } = {};
+    private body: { [key: string]: string } | string = {};
     
     constructor(req: string, registeredRoutes: Map<string, HttpEndpoint>) {
         const reqBody = req.split(" ");
@@ -85,6 +88,7 @@ class RequestBuilder {
             .reduce((a, v) => {
                 return { ...a, [v.split(':')[0].replace('-', '_').toLowerCase()]: v.split(' ')[1] }
             }, {});
+        this.body = specialCharSplit.slice(-1)[0];
 
         for (let [route] of registeredRoutes) {
             // Replace params with a regex group that matches one or more words/hyphens
@@ -110,7 +114,8 @@ class RequestBuilder {
             method: this.method,
             endpoint: this.endpoint,
             params: this.params,
-            headers: this.headers
+            headers: this.headers,
+            body: this.body
         }
     }
 }
@@ -179,7 +184,6 @@ app.get("/files/:filename", (req: HttpReq, res: HttpRes) => {
     const path = process.argv.slice(-1);
     if (req.params?.filename) {
         const fileLocation = `${path}${req.params.filename}`;
-        console.log(fileLocation);
         try {
             let file = fs.readFileSync(fileLocation);
             if (file) {
@@ -191,6 +195,19 @@ app.get("/files/:filename", (req: HttpReq, res: HttpRes) => {
     }
 
     return res.status("404").send("File not found");
+});
+
+app.post("/files/:filename", (req: HttpReq, res: HttpRes) => {
+    const path = process.argv.slice(-1);
+    if (req.params?.filename && req.body) {
+        const fileLocation = `${path}${req.params.filename}`;
+        try {
+            fs.writeFileSync(fileLocation, req.body as string);
+            return res.status("201").send();
+        } catch {
+            return res.status("404").send("Something went terrible wrong");
+        }
+    }
 });
 
 app.listen(4221, () => {
