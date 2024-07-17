@@ -63,6 +63,7 @@ class HttpRes {
             try {
                 body = zlib.gzipSync(body);
                 this.header('Content-Encoding', 'gzip');
+                this.header('Content-Length', body.length.toString());
             } catch {
                 console.log("Failed to compress");
             }
@@ -155,9 +156,7 @@ class HttpServer {
                                 .split(',')
                                 .map((item) => item.trim())
                             );
-                            console.log(formats);
                             let encodings = new Set([...AcceptableEncoding].filter(i => formats.has(i)));
-                            console.log(encodings);
                             // means that gzip was one of the formats
                             if (encodings.size > 0) {
                                 encode = true;
